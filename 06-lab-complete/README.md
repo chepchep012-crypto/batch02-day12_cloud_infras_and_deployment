@@ -1,100 +1,94 @@
-# Lab 12 — Complete Production Agent
+# Lab 12 — Travel Chatbot (Production + CI/CD)
 
-Kết hợp TẤT CẢ những gì đã học trong 1 project hoàn chỉnh.
+Production-hoá **AI Travel Chatbot** (Day 5-6 Hackathon) và deploy lên **Railway bằng Docker**,
+kèm pipeline **CI/CD GitHub Actions** (lint + unit test coverage → auto deploy).
 
-## Checklist Deliverable
+## 🌍 Live Demo (Railway)
 
-- [x] Dockerfile (multi-stage, < 500 MB)
-- [x] docker-compose.yml (agent + redis)
-- [x] .dockerignore
-- [x] Health check endpoint (`GET /health`)
-- [x] Readiness endpoint (`GET /ready`)
-- [x] API Key authentication
-- [x] Rate limiting
-- [x] Cost guard
-- [x] Config từ environment variables
-- [x] Structured logging
-- [x] Graceful shutdown
-- [x] Public URL ready (Railway / Render config)
+- API: **https://travel-chatbot-production-0b51.up.railway.app**
+- Health: [`/health`](https://travel-chatbot-production-0b51.up.railway.app/health)
+- Swagger: [`/docs`](https://travel-chatbot-production-0b51.up.railway.app/docs)
+
+```bash
+# Chat (rule-based, không cần API key)
+curl -X POST https://travel-chatbot-production-0b51.up.railway.app/api/chat/ \
+  -H "Content-Type: application/json" \
+  -d '{"messages":[{"role":"user","content":"hello"}]}'
+```
 
 ---
 
-## Cấu Trúc
+## Cấu trúc
 
 ```
 06-lab-complete/
 ├── app/
-│   ├── main.py         # Entry point — kết hợp tất cả
-│   ├── config.py       # 12-factor config
-│   ├── auth.py         # API Key + JWT
-│   ├── rate_limiter.py # Rate limiting
-│   └── cost_guard.py   # Budget protection
-├── Dockerfile          # Multi-stage, production-ready
-├── docker-compose.yml  # Full stack
-├── railway.toml        # Deploy Railway
-├── render.yaml         # Deploy Render
-├── .env.example        # Template
-├── .dockerignore
-└── requirements.txt
+│   ├── main.py            # FastAPI: /health, /ready, /api/chat + JSON logging, CORS, SIGTERM
+│   ├── config.py          # 12-factor config từ env
+│   ├── routers/chat.py     # POST /api/chat/
+│   └── services/chatbot.py # OpenAI + rule-based fallback
+├── tests/                 # pytest (14 tests, coverage 93%)
+├── Dockerfile             # multi-stage, non-root, healthcheck (~248 MB)
+├── docker-compose.yml
+├── railway.toml           # builder = DOCKERFILE
+├── render.yaml            # Blueprint cho Render (tùy chọn)
+├── requirements.txt / requirements-dev.txt
+├── pyproject.toml         # cấu hình ruff + pytest + coverage
+└── .dockerignore / .env.example
 ```
+
+CI/CD workflow: [`.github/workflows/ci-cd.yml`](../.github/workflows/ci-cd.yml)
 
 ---
 
-## Chạy Local
+## Chạy local
 
 ```bash
-# 1. Setup
-cp .env.example .env
+# Docker
+docker build -t travel-chatbot .
+docker run -p 8000:8000 -e PORT=8000 travel-chatbot
+curl localhost:8000/health
 
-# 2. Chạy với Docker Compose
-docker compose up
-
-# 3. Test
-curl http://localhost/health
-
-# 4. Lấy API key từ .env, test endpoint
-API_KEY=$(grep AGENT_API_KEY .env | cut -d= -f2)
-curl -H "X-API-Key: $API_KEY" \
-     -X POST http://localhost/ask \
-     -H "Content-Type: application/json" \
-     -d '{"question": "What is deployment?"}'
+# Hoặc compose
+docker compose up --build
 ```
 
----
-
-## Deploy Railway (< 5 phút)
+## Test + Lint (giống CI)
 
 ```bash
-# Cài Railway CLI
-npm i -g @railway/cli
-
-# Login và deploy
-railway login
-railway init
-railway variables set OPENAI_API_KEY=sk-...
-railway variables set AGENT_API_KEY=your-secret-key
-railway up
-
-# Nhận public URL!
-railway domain
+pip install -r requirements-dev.txt
+ruff check .
+pytest --cov=app --cov-report=term-missing --cov-fail-under=70
 ```
 
 ---
 
-## Deploy Render
+## CI/CD Pipeline (GitHub Actions)
 
-1. Push repo lên GitHub
-2. Render Dashboard → New → Blueprint
-3. Connect repo → Render đọc `render.yaml`
-4. Set secrets: `OPENAI_API_KEY`, `AGENT_API_KEY`
-5. Deploy → Nhận URL!
+Trigger: push / PR vào `main` có thay đổi trong `06-lab-complete/`.
+
+| Job | Việc làm |
+|-----|----------|
+| **CI** | `ruff check` (lint) → `pytest --cov` (unit test, fail nếu coverage < 70%) → upload `coverage.xml` |
+| **CD** | Cài Railway CLI → `railway up` (Docker build trên Railway). Chỉ chạy khi push vào `main`. |
+
+### Bật auto-deploy (CD)
+
+CD job sẽ **skip** nếu chưa có token. Để bật:
+
+1. Railway Dashboard → project `day12` → **Settings → Tokens** → tạo **Project Token**.
+2. GitHub repo → **Settings → Secrets and variables → Actions**:
+   - **Secret** `RAILWAY_TOKEN` = project token vừa tạo.
+   - **Variable** `RAILWAY_SERVICE` = `travel-chatbot` (tùy chọn, đã có default).
+3. Push lên `main` → pipeline tự build & deploy.
 
 ---
 
-## Kiểm Tra Production Readiness
+## Deploy thủ công (Railway CLI)
 
 ```bash
-python check_production_ready.py
+railway link -p <project-id> -e production
+railway add -s travel-chatbot
+railway up -s travel-chatbot -c -y
+railway domain -s travel-chatbot
 ```
-
-Script này kiểm tra tất cả items trong checklist và báo cáo những gì còn thiếu.

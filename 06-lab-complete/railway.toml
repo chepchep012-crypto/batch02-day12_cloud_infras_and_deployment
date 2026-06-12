@@ -1,8 +1,13 @@
+# ============================================================
+# railway.toml — Deploy Travel Chatbot bằng Docker
+# ============================================================
+
 [build]
 builder = "DOCKERFILE"
 
 [deploy]
-startCommand = "uvicorn app.main:app --host 0.0.0.0 --port $PORT --workers 2"
+# Không set startCommand — dùng CMD trong Dockerfile (đã shell-expand $PORT đúng).
+# Railway truyền startCommand không qua shell nên "$PORT" sẽ không được expand.
 healthcheckPath = "/health"
 healthcheckTimeout = 30
 restartPolicyType = "ON_FAILURE"

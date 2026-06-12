@@ -1,0 +1,79 @@
+name: CI/CD — Travel Chatbot
+
+# Chạy khi push/PR vào main và có thay đổi trong 06-lab-complete
+on:
+  push:
+    branches: [main]
+    paths:
+      - "06-lab-complete/**"
+      - ".github/workflows/ci-cd.yml"
+  pull_request:
+    branches: [main]
+    paths:
+      - "06-lab-complete/**"
+  workflow_dispatch:   # cho phép chạy tay từ tab Actions
+
+defaults:
+  run:
+    working-directory: 06-lab-complete
+
+jobs:
+  # ──────────────────────────────────────────────
+  # CI: Lint + Unit test + Coverage
+  # ──────────────────────────────────────────────
+  ci:
+    name: CI · Lint & Test
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python 3.11
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+
+      - name: Install dependencies
+        run: pip install -r requirements-dev.txt
+
+      - name: Lint (ruff)
+        run: ruff check .
+
+      - name: Unit tests + coverage (fail < 70%)
+        run: pytest --cov=app --cov-report=term-missing --cov-report=xml --cov-fail-under=70
+
+      - name: Upload coverage report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-report
+          path: 06-lab-complete/coverage.xml
+          if-no-files-found: ignore
+
+  # ──────────────────────────────────────────────
+  # CD: Deploy lên Railway (chỉ khi push vào main)
+  # ──────────────────────────────────────────────
+  cd:
+    name: CD · Deploy to Railway
+    needs: ci
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install Railway CLI
+        run: npm i -g @railway/cli
+
+      - name: Deploy (Docker build on Railway)
+        env:
+          RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN }}
+          RAILWAY_SERVICE: ${{ vars.RAILWAY_SERVICE || 'travel-chatbot' }}
+        run: |
+          if [ -z "$RAILWAY_TOKEN" ]; then
+            echo "::warning::RAILWAY_TOKEN chưa được set — bỏ qua deploy."
+            echo "Thêm secret RAILWAY_TOKEN (Project Token) trong repo Settings → Secrets → Actions để bật auto-deploy."
+            exit 0
+          fi
+          railway up --service "$RAILWAY_SERVICE" --ci

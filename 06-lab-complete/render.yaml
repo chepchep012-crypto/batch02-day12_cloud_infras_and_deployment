@@ -1,9 +1,13 @@
+# Render Blueprint — Travel Chatbot (Docker)
+# Để dùng: copy file này ra gốc repo (Render đọc render.yaml ở root),
+# hoặc tạo Web Service thủ công trỏ Dockerfile = 06-lab-complete/Dockerfile.
 services:
   - type: web
-    name: ai-agent-production
+    name: travel-chatbot
     runtime: docker
+    rootDir: 06-lab-complete
     region: singapore
-    plan: starter
+    plan: free
     healthCheckPath: /health
     autoDeploy: true
     envVars:
@@ -11,13 +15,8 @@ services:
         value: production
       - key: APP_VERSION
         value: "1.0.0"
+      - key: CORS_ORIGINS
+        value: "*"
+      # Optional — để trống dùng rule-based offline
       - key: OPENAI_API_KEY
         sync: false
-      - key: AGENT_API_KEY
-        generateValue: true
-      - key: JWT_SECRET
-        generateValue: true
-      - key: DAILY_BUDGET_USD
-        value: "5.0"
-      - key: RATE_LIMIT_PER_MINUTE
-        value: "20"

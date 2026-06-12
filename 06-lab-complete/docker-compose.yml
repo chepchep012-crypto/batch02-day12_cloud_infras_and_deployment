@@ -1,19 +1,14 @@
-version: "3.9"
-
 services:
-  agent:
+  backend:
     build: .
+    container_name: travel-chatbot
     ports:
       - "8000:8000"
     environment:
       - ENVIRONMENT=staging
-      - APP_NAME=Production AI Agent
-      - REDIS_URL=redis://redis:6379/0
-    env_file:
-      - .env.local
-    depends_on:
-      redis:
-        condition: service_healthy
+      - APP_NAME=Travel Chatbot API
+      - CORS_ORIGINS=http://localhost:3000
+      - OPENAI_API_KEY=${OPENAI_API_KEY:-}
     healthcheck:
       test: ["CMD", "python", "-c",
              "import urllib.request; urllib.request.urlopen('http://localhost:8000/health')"]
@@ -22,12 +17,3 @@ services:
       retries: 3
       start_period: 15s
     restart: unless-stopped
-
-  redis:
-    image: redis:7-alpine
-    command: redis-server --maxmemory 128mb --maxmemory-policy allkeys-lru
-    healthcheck:
-      test: ["CMD", "redis-cli", "ping"]
-      interval: 10s
-      timeout: 3s
-      retries: 3

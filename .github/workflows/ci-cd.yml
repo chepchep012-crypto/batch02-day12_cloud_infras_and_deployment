@@ -68,12 +68,12 @@ jobs:
 
       - name: Deploy (Docker build on Railway)
         env:
-          RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN }}
+          RAILWAY_TOKEN: ${{ secrets.RAILWAYTOKEN }}
           RAILWAY_SERVICE: ${{ vars.RAILWAY_SERVICE || 'travel-chatbot' }}
         run: |
           if [ -z "$RAILWAY_TOKEN" ]; then
-            echo "::warning::RAILWAY_TOKEN chưa được set — bỏ qua deploy."
-            echo "Thêm secret RAILWAY_TOKEN (Project Token) trong repo Settings → Secrets → Actions để bật auto-deploy."
+            echo "::warning::RAILWAYTOKEN chưa được set — bỏ qua deploy."
+            echo "Thêm secret RAILWAYTOKEN (Project Token) trong repo Settings → Secrets → Actions để bật auto-deploy."
             exit 0
           fi
           railway up --service "$RAILWAY_SERVICE" --ci
